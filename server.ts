@@ -1,17 +1,11 @@
 import express from 'express';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { GoogleGenAI, Type } from '@google/genai';
-import { createServer as createViteServer } from 'vite';
 
 dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const app = express();
-const PORT = 3000;
 
 app.use(express.json({ limit: '1mb' }));
 
@@ -298,6 +292,11 @@ function withTimeout<T>(promise: Promise<T>, ms: number, timeoutMsg: string): Pr
   return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer));
 }
 
+// Health check endpoint
+app.get('/api/health', (_req, res) => {
+  res.json({ status: 'ok', service: 'ScamSense AI' });
+});
+
 // Endpoint: Analyze message
 app.post('/api/analyze', async (req, res) => {
   const { message } = req.body;
@@ -450,9 +449,13 @@ Please answer the user's question directly with clear, practical, cybersecurity 
   }
 });
 
-// Start server with Vite middleware or static serving
+// Start server with Vite middleware in dev or static serving in production
 async function startServer() {
-  if (process.env.NODE_ENV !== 'production') {
+  const isDev = process.env.NODE_ENV !== 'production' && !process.argv.includes('--production');
+  const targetPort = !isDev && process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+
+  if (isDev) {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
@@ -466,8 +469,8 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🛡️ ScamSense AI server running on http://0.0.0.0:${PORT}`);
+  app.listen(targetPort, '0.0.0.0', () => {
+    console.log(`🛡️ ScamSense AI server running on http://0.0.0.0:${targetPort}`);
   });
 }
 
